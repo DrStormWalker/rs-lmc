@@ -34,51 +34,33 @@ impl<'a> SourceBuffer<'a> {
     }
 
     pub fn get_lines(&self, span: Span) -> Option<&str> {
-        let line_pos = *self.lines.get(span.start.line)?;
-        let line_end = *self
-            .lines
-            .get(span.end.line + 1)
-            .unwrap_or(&self.source.len());
+        let line_pos = *self.lines.get(span.line)?;
+        let line_end = *self.lines.get(span.line + 1).unwrap_or(&self.source.len());
 
         Some(&self.source[line_pos + 1..line_end])
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Ord)]
-pub struct Position {
-    pub(crate) line: usize,
-    pub(crate) char: usize,
-}
-impl Position {
-    pub fn new(line: usize, char: usize) -> Self {
-        Self { line, char }
-    }
-}
-impl fmt::Debug for Position {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.line, self.char)
-    }
-}
-impl PartialOrd for Position {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.line.cmp(&other.line).then(self.char.cmp(&other.char)))
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub struct Span {
-    pub(crate) start: Position,
-    pub(crate) end: Position,
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) line: usize,
 }
 impl Span {
-    pub fn new(start: Position, end: Position) -> Self {
-        Self { start, end }
+    pub fn new(start: usize, end: usize, line: usize) -> Self {
+        Self { start, end, line }
     }
 
     pub fn union(&self, other: Self) -> Self {
+        if self.line != other.line {
+            panic!("Two spans that are unionized must be from the same line");
+        }
+
         Self {
             start: self.start.min(other.start),
             end: self.end.max(other.end),
+            line: self.line,
         }
     }
 
@@ -86,31 +68,45 @@ impl Span {
         &self,
         buffer: &'b SourceBuffer<'a>,
         label: Option<RenderLabel<'b>>,
-        file: &'b str,
-        notes: &'b [&'b str],
+        padding: &'b str,
     ) -> SpanRenderer<'a, 'b> {
         SpanRenderer {
             source: buffer,
             span: *self,
             label,
-            file,
-            notes,
+            padding,
         }
     }
 
     pub fn len(&self) -> usize {
-        self.end.char - self.start.char
+        self.end - self.start
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum RenderLabel<'a> {
     Error(&'a str),
+    Info(&'a str),
 }
 impl<'a> RenderLabel<'a> {
+    pub fn label(&self) -> &'a str {
+        match self {
+            Self::Error(s) => s,
+            Self::Info(s) => s,
+        }
+    }
+
+    pub fn underline_char(&self) -> char {
+        match self {
+            Self::Error(_) => '^',
+            Self::Info(_) => '-',
+        }
+    }
+
     pub fn get_colour(&self) -> Color {
         match self {
             Self::Error(_) => Color::BrightRed,
+            Self::Info(_) => Color::BrightBlue,
         }
     }
 }
@@ -126,77 +122,58 @@ impl<'a> fmt::Display for RenderLabel<'a> {
                 ":".bold(),
                 err.bold()
             ),
+            Self::Info(info) => write!(
+                f,
+                "{}{} {}",
+                "info".bright_blue().bold(),
+                ":".bold(),
+                info.bold(),
+            ),
         }
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct SpanRenderer<'a, 'b> {
     source: &'b SourceBuffer<'a>,
-    span: Span,
+    pub(crate) span: Span,
     label: Option<RenderLabel<'b>>,
-    file: &'b str,
-
-    notes: &'b [&'b str],
+    padding: &'b str,
 }
 impl<'a, 'b> fmt::Display for SpanRenderer<'a, 'b> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use colored::Colorize;
 
-        let line = self.source.get_line(self.span.start.line).unwrap();
+        let line = self.source.get_line(self.span.line).unwrap();
 
-        let underline = iter::repeat(' ')
-            .take(self.span.start.char)
-            .collect::<String>()
-            + &iter::repeat('^').take(self.span.len()).collect::<String>();
+        let line_number = format!("{}", self.span.line);
 
-        let line_number = format!("{}", self.span.start.line);
-
-        let padding = iter::repeat(' ')
-            .take(line_number.len())
-            .collect::<String>();
-
-        if let Some(label) = self.label {
-            writeln!(f, "{}", label)?;
-        }
-        writeln!(
+        write!(
             f,
-            "{}{} {}:{}:{}",
-            padding,
-            "-->".bright_blue().bold(),
-            self.file,
-            self.span.start.line,
-            self.span.start.char,
-        )?;
-        writeln!(f, "{} {}", padding, "|".bright_blue().bold())?;
-        writeln!(
-            f,
-            "{} {} {}",
+            "{: <padding_width$} {} {}",
             line_number.bright_blue().bold(),
             "|".bright_blue().bold(),
             line,
-        )?;
-        writeln!(
-            f,
-            "{} {} {}",
-            padding,
-            "|".bright_blue().bold(),
-            underline
-                .color(
-                    self.label
-                        .map_or(Color::BrightBlue, |label| label.get_colour())
-                )
-                .bold()
+            padding_width = self.padding.len(),
         )?;
 
-        for note in self.notes {
-            writeln!(
+        if let Some(label) = self.label {
+            let underline = iter::repeat(' ').take(self.span.start).collect::<String>()
+                + &iter::repeat(label.underline_char())
+                    .take(self.span.len())
+                    .collect::<String>();
+
+            write!(
                 f,
-                "{} {} {}: {}",
-                padding,
-                "=".bright_blue().bold(),
-                "note".bold(),
-                note
+                "\n{} {} {}",
+                self.padding,
+                "|".bright_blue().bold(),
+                underline.color(label.get_colour()).bold(),
             )?;
+
+            if label.label().len() > 0 {
+                write!(f, " {}", label.label().color(label.get_colour()).bold(),)?;
+            }
         }
 
         Ok(())

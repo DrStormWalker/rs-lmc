@@ -47,14 +47,12 @@ impl FromStr for OpCode {
 }
 
 #[derive(Debug)]
-pub(crate) enum OperandValue {
-    Label(String),
+pub(crate) enum OperandValue<'a> {
+    Label(&'a str),
     Value(i64),
 }
-impl FromStr for OperandValue {
-    type Err = OperandParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl<'a> OperandValue<'a> {
+    pub fn from_str(s: &'a str) -> Result<Self, OperandParseError> {
         lazy_static! {
             static ref LABEL_RE: Regex = Regex::new("^[a-zA-Z_][a-zA-Z_0-9]*$").unwrap();
             static ref NUMBER_START_RE: Regex = Regex::new("^[0-9]").unwrap();
@@ -69,7 +67,7 @@ impl FromStr for OperandValue {
 
             Ok(Self::Value(value))
         } else {
-            Ok(Self::Label(s.to_string()))
+            Ok(Self::Label(s))
         }
     }
 }
@@ -84,21 +82,31 @@ pub enum OperandParseError {
 }
 
 #[derive(Debug)]
-pub(crate) enum Operand {
-    Addr(OperandValue),
-    Immediate(OperandValue),
-    Indirect(OperandValue),
+pub(crate) enum Operand<T> {
+    Addr(T),
+    Immediate(T),
+    Indirect(T),
 }
-impl FromStr for Operand {
-    type Err = OperandParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl<T> Operand<T> {
+    pub fn try_map_value<B, E, F>(self, f: F) -> Result<Operand<B>, E>
+    where
+        F: FnOnce(T) -> Result<B, E>,
+    {
+        Ok(match self {
+            Self::Addr(v) => Operand::Addr(f(v)?),
+            Self::Immediate(v) => Operand::Immediate(f(v)?),
+            Self::Indirect(v) => Operand::Indirect(f(v)?),
+        })
+    }
+}
+impl<'a> Operand<OperandValue<'a>> {
+    pub fn from_str(s: &'a str) -> Result<Self, OperandParseError> {
         if s.starts_with("#") {
-            Ok(Operand::Immediate(s[1..].parse()?))
+            Ok(Operand::Immediate(OperandValue::from_str(&s[1..])?))
         } else if s.starts_with("@") {
-            Ok(Operand::Indirect(s[1..].parse()?))
+            Ok(Operand::Indirect(OperandValue::from_str(&s[1..])?))
         } else {
-            Ok(Operand::Addr(s.parse()?))
+            Ok(Operand::Addr(OperandValue::from_str(&s[..])?))
         }
     }
 }
@@ -107,5 +115,11 @@ impl FromStr for Operand {
 pub(crate) struct RawInst<'a> {
     pub(crate) label: Option<Token<'a>>,
     pub(crate) opcode: (Span, OpCode),
-    pub(crate) operand: Option<(Span, Operand)>,
+    pub(crate) operand: Option<(Span, Operand<OperandValue<'a>>)>,
+}
+
+#[derive(Debug)]
+pub struct Inst {
+    pub(crate) opcode: OpCode,
+    pub(crate) operand: Option<Operand<i64>>,
 }
