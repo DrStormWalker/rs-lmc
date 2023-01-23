@@ -12,9 +12,10 @@ use std::{
 };
 
 use clap::{Args, Parser, Subcommand};
-use compiler::compile_lmc_asm;
-use error::{CompilerError, CompilerResult};
+use compiler::compile_lmc_asm_with_source_map;
+use error::{CompilerError, InterpreterErrorRenderer, SourceErrorRenderHelper};
 use interpreter::{InterpreterError, Vm};
+use memory::MemoryError;
 use span::SourceBuffer;
 use thiserror::Error;
 
@@ -37,34 +38,46 @@ enum Commands {
     Run(RunArgs),
 }
 
-#[derive(Debug, Error)]
-pub enum RunError<'a> {
-    #[error(transparent)]
-    CompilerError(CompilerError<'a>),
-    #[error(transparent)]
-    InterpreterError(#[from] InterpreterError),
-}
-
-pub type RunResult<'a, T> = Result<T, RunError<'a>>;
-
-fn run<'a>(args: &RunArgs, asm: &'a str) -> RunResult<'a, ()> {
+fn run<'a>(args: &RunArgs, asm: &'a str) -> Option<()> {
     let source = SourceBuffer::new(&asm);
 
-    let insts = compile_lmc_asm(&source.source()).map_err(|e| RunError::CompilerError(e))?;
+    let filepath = args.filepath.display().to_string();
+
+    let (insts, source_map) = match compile_lmc_asm_with_source_map(&source.source()) {
+        Ok((insts, source_map)) => (insts, source_map),
+        Err(e) => {
+            let render = e.render(&source, &filepath);
+
+            println!("{}", render);
+
+            return None;
+        }
+    };
 
     let mut memory = DynamicMemoryStorage::<String>::new();
 
     for (i, inst) in insts.into_iter().enumerate() {
-        memory
-            .set_inst(i, inst)
-            .map_err(|e| InterpreterError::MemoryError(e))?;
+        if let Err(e) = memory.set_inst(i, inst) {
+            todo!();
+        }
     }
 
     let mut vm = Vm::new(memory);
 
-    vm.run_program()?;
+    if let Err(e) = vm.run_program() {
+        let render = InterpreterErrorRenderer {
+            error: e,
+            source_map: &source_map,
+            source: &source,
+            filepath: &filepath,
+        };
 
-    Ok(())
+        println!("\n{}", render);
+
+        return None;
+    }
+
+    Some(())
 }
 
 fn main() -> Result<(), io::Error> {
@@ -77,9 +90,7 @@ fn main() -> Result<(), io::Error> {
                 .unwrap()
                 .read_to_string(&mut asm)?;
 
-            if let Err(e) = run(run_args, &asm) {
-                println!("\n{}", e);
-            }
+            run(run_args, &asm);
         }
     }
 

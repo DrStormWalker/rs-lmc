@@ -200,3 +200,35 @@ pub fn compile_lmc_asm<'a>(asm: &'a str) -> CompilerResult<Vec<Inst>> {
 
     process_labels(raw_insts, symbol_table)
 }
+
+pub type SourceMap = HashMap<usize, Span>;
+
+fn generate_source_map<'a>(insts: &[RawInst<'a>]) -> SourceMap {
+    let mut map = HashMap::new();
+
+    for (i, inst) in insts.iter().enumerate() {
+        let mut span = inst.opcode.0;
+
+        if let Some(label) = inst.label {
+            span = label.span.union(span);
+        }
+
+        if let Some(operand) = inst.operand.as_ref() {
+            span = operand.0.union(span);
+        }
+
+        map.insert(i, span);
+    }
+
+    map
+}
+
+pub fn compile_lmc_asm_with_source_map<'a>(asm: &'a str) -> CompilerResult<(Vec<Inst>, SourceMap)> {
+    let tokens = tokenize_lmc_asm(asm);
+
+    let (raw_insts, symbol_table) = parse_lmc_asm(tokens)?;
+
+    let source_map = generate_source_map(&raw_insts);
+
+    process_labels(raw_insts, symbol_table).map(move |insts| (insts, source_map))
+}

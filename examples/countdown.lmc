@@ -1,4 +1,4 @@
-        INP 
+        INP
 loop    OUT
         STA count
         SUB one
@@ -6,5 +6,6 @@ loop    OUT
         BRP loop
         HLT
 		
-count   DAT
 one     DAT 1
+count   DAT 
+  

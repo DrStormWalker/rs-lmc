@@ -11,24 +11,32 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
-pub enum InterpreterError {
+pub enum InterpreterErrorSource {
     #[error(transparent)]
     MemoryError(#[from] MemoryError),
 
-    #[error("Attempted to use a NaN value as an address")]
+    #[error("attempted to use a NaN value as an address")]
     NaNAddrError,
 
-    #[error("Attempted to use an Inf value as an address")]
+    #[error("attempted to use an Inf value as an address")]
     InfAddrError,
 
-    #[error("Attempted to use a -Inf value as an address")]
+    #[error("attempted to use a -Inf value as an address")]
     NegInfAddrError,
 
-    #[error("Attemped to use a negative value as an adress")]
+    #[error("attemped to use a negative value as an adress")]
     NegAddrError,
 
     #[error(transparent)]
     IoError(#[from] IoError),
+}
+
+#[derive(Debug, Error)]
+#[error("Error while executing instruction `{pc}`: {source}")]
+pub struct InterpreterError {
+    pub(crate) pc: usize,
+    #[source]
+    pub(crate) source: InterpreterErrorSource,
 }
 
 pub type InterpreterResult<T> = Result<T, InterpreterError>;
@@ -60,7 +68,12 @@ impl<M: MemoryStorage + Debug> Vm<M> {
 
     pub fn run_program(&mut self) -> InterpreterResult<()> {
         loop {
-            self.fetch_decode()?;
+            if let Err(e) = self.fetch_decode() {
+                return Err(InterpreterError {
+                    pc: self.pc,
+                    source: e,
+                });
+            }
 
             // println!(
             //     "pc: {:?}, mar: {:?}, mdr: {:?}, cir: {:?}, acc: {:?}",
@@ -73,46 +86,54 @@ impl<M: MemoryStorage + Debug> Vm<M> {
                 break Ok(());
             }
 
-            self.execute()?;
+            if let Err(e) = self.execute() {
+                return Err(InterpreterError {
+                    pc: self.pc - 1,
+                    source: e,
+                });
+            }
         }
     }
 
-    fn get_operand_value(&mut self, operand: Operand<i64>) -> InterpreterResult<Value> {
+    fn get_operand_value(
+        &mut self,
+        operand: Operand<i64>,
+    ) -> Result<Value, InterpreterErrorSource> {
         match operand {
             Operand::Addr(addr) => Ok(self.memory.get_value(
                 addr.try_into()
-                    .map_err(|_| InterpreterError::NegAddrError)?,
+                    .map_err(|_| InterpreterErrorSource::NegAddrError)?,
             )?),
             Operand::Immediate(imm) => Ok(Value::Number(imm)),
             Operand::Indirect(addr) => {
                 let addr = self.memory.get_value(
                     addr.try_into()
-                        .map_err(|_| InterpreterError::NegAddrError)?,
+                        .map_err(|_| InterpreterErrorSource::NegAddrError)?,
                 )?;
 
                 let addr = match addr {
                     Value::Number(addr) => addr,
-                    Value::InfPositive => return Err(InterpreterError::InfAddrError),
-                    Value::InfNegative => return Err(InterpreterError::NegInfAddrError),
-                    Value::NaN => return Err(InterpreterError::NaNAddrError),
+                    Value::InfPositive => return Err(InterpreterErrorSource::InfAddrError),
+                    Value::InfNegative => return Err(InterpreterErrorSource::NegInfAddrError),
+                    Value::NaN => return Err(InterpreterErrorSource::NaNAddrError),
                 };
 
                 Ok(self.memory.get_value(
                     addr.try_into()
-                        .map_err(|_| InterpreterError::NegAddrError)?,
+                        .map_err(|_| InterpreterErrorSource::NegAddrError)?,
                 )?)
             }
         }
     }
 
-    fn get_operand_addr(&mut self, operand: Operand<i64>) -> InterpreterResult<Value> {
+    fn get_operand_addr(&mut self, operand: Operand<i64>) -> Result<Value, InterpreterErrorSource> {
         match operand {
             Operand::Addr(addr) => Ok(Value::Number(addr)),
             Operand::Immediate(imm) => Ok(Value::Number(imm)),
             Operand::Indirect(addr) => {
                 let addr = self.memory.get_value(
                     addr.try_into()
-                        .map_err(|_| InterpreterError::NegAddrError)?,
+                        .map_err(|_| InterpreterErrorSource::NegAddrError)?,
                 )?;
 
                 Ok(addr)
@@ -120,29 +141,29 @@ impl<M: MemoryStorage + Debug> Vm<M> {
         }
     }
 
-    pub fn fetch_decode(&mut self) -> InterpreterResult<()> {
+    pub fn fetch_decode(&mut self) -> Result<(), InterpreterErrorSource> {
         self.cir = self.memory.get_inst(self.pc)?;
         self.pc += 1;
 
         Ok(())
     }
 
-    pub fn break_to(&mut self, addr: Value) -> InterpreterResult<()> {
+    pub fn break_to(&mut self, addr: Value) -> Result<(), InterpreterErrorSource> {
         match addr {
             Value::Number(addr) => {
                 self.pc = addr
                     .try_into()
-                    .map_err(|_| InterpreterError::NegAddrError)?;
+                    .map_err(|_| InterpreterErrorSource::NegAddrError)?;
             }
-            Value::InfPositive => return Err(InterpreterError::InfAddrError),
-            Value::InfNegative => return Err(InterpreterError::NegInfAddrError),
-            Value::NaN => return Err(InterpreterError::NaNAddrError),
+            Value::InfPositive => return Err(InterpreterErrorSource::InfAddrError),
+            Value::InfNegative => return Err(InterpreterErrorSource::NegInfAddrError),
+            Value::NaN => return Err(InterpreterErrorSource::NaNAddrError),
         }
 
         Ok(())
     }
 
-    pub fn execute(&mut self) -> InterpreterResult<()> {
+    pub fn execute(&mut self) -> Result<(), InterpreterErrorSource> {
         match self.cir.opcode {
             OpCode::Inp => {
                 let mut buffer = String::new();
@@ -176,12 +197,12 @@ impl<M: MemoryStorage + Debug> Vm<M> {
                     match value {
                         Value::Number(addr) => self.memory.set_value(
                             addr.try_into()
-                                .map_err(|_| InterpreterError::NegAddrError)?,
+                                .map_err(|_| InterpreterErrorSource::NegAddrError)?,
                             self.acc,
                         )?,
-                        Value::InfPositive => return Err(InterpreterError::InfAddrError),
-                        Value::InfNegative => return Err(InterpreterError::NegInfAddrError),
-                        Value::NaN => return Err(InterpreterError::NaNAddrError),
+                        Value::InfPositive => return Err(InterpreterErrorSource::InfAddrError),
+                        Value::InfNegative => return Err(InterpreterErrorSource::NegInfAddrError),
+                        Value::NaN => return Err(InterpreterErrorSource::NaNAddrError),
                     }
                 }
             }

@@ -4,7 +4,9 @@ use std::iter;
 use thiserror::Error;
 
 use crate::{
+    compiler::SourceMap,
     instruction::OperandParseError,
+    interpreter::{InterpreterError, InterpreterErrorSource},
     span::{RenderLabel, SourceBuffer, Span},
 };
 
@@ -31,12 +33,8 @@ pub enum CompilerError<'a> {
     UndefinedLabel(&'a str, Span),
 }
 impl<'a> CompilerError<'a> {
-    pub fn render(
-        self,
-        source: &'a SourceBuffer,
-        filepath: &'a str,
-    ) -> InterpreterErrorRenderer<'a> {
-        InterpreterErrorRenderer {
+    pub fn render(self, source: &'a SourceBuffer, filepath: &'a str) -> CompileErrorRenderer<'a> {
+        CompileErrorRenderer {
             error: self,
             source,
             filepath,
@@ -44,18 +42,18 @@ impl<'a> CompilerError<'a> {
     }
 }
 
-pub struct InterpreterErrorRenderer<'a> {
+pub struct CompileErrorRenderer<'a> {
     error: CompilerError<'a>,
     source: &'a SourceBuffer<'a>,
     filepath: &'a str,
 }
-impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
+impl<'a> fmt::Display for CompileErrorRenderer<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.error {
             CompilerError::UnexpectedTokens(span) => write!(
                 f,
                 "{}",
-                InterpreterErrorRenderHelper {
+                SourceErrorRenderHelper {
                     label: Some(RenderLabel::Error("unexpected tokens")),
                     filepath: self.filepath,
                     source: self.source,
@@ -69,7 +67,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
             CompilerError::ExpectedOpCode(span) => write!(
                 f,
                 "{}",
-                InterpreterErrorRenderHelper {
+                SourceErrorRenderHelper {
                     label: Some(RenderLabel::Error("expected an opcode")),
                     filepath: self.filepath,
                     source: self.source,
@@ -84,7 +82,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                 OperandParseError::InvalidIntegerLiteral(e) => write!(
                     f,
                     "{}",
-                    InterpreterErrorRenderHelper {
+                    SourceErrorRenderHelper {
                         label: Some(RenderLabel::Error("invalid integer literal")),
                         filepath: self.filepath,
                         source: self.source,
@@ -98,7 +96,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                 OperandParseError::InvalidLabel(label) => write!(
                     f,
                     "{}",
-                    InterpreterErrorRenderHelper {
+                    SourceErrorRenderHelper {
                         label: Some(RenderLabel::Error("invalid label")),
                         filepath: self.filepath,
                         source: self.source,
@@ -113,7 +111,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
             CompilerError::InvalidLabel(label, span) => write!(
                 f,
                 "{}",
-                InterpreterErrorRenderHelper {
+                SourceErrorRenderHelper {
                     label: Some(RenderLabel::Error("invalid label")),
                     filepath: self.filepath,
                     source: self.source,
@@ -127,7 +125,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
             CompilerError::DuplicateLabel(label, first, again) => write!(
                 f,
                 "{}",
-                InterpreterErrorRenderHelper {
+                SourceErrorRenderHelper {
                     label: Some(RenderLabel::Error(&format!("the label `{}` has been defined multiple times", label))),
                     filepath: self.filepath,
                     source: self.source,
@@ -144,7 +142,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
             CompilerError::UndefinedLabel(label, span) => write!(
                 f,
                 "{}",
-                InterpreterErrorRenderHelper {
+                SourceErrorRenderHelper {
                     label: Some(RenderLabel::Error(&format!("use of undefined label `{}`", label))),
                     filepath: self.filepath,
                     source: self.source,
@@ -159,7 +157,39 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
     }
 }
 
-struct InterpreterErrorRenderHelper<'a> {
+pub struct InterpreterErrorRenderer<'a> {
+    pub(crate) error: InterpreterError,
+    pub(crate) source_map: &'a SourceMap,
+    pub(crate) source: &'a SourceBuffer<'a>,
+    pub(crate) filepath: &'a str,
+}
+impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let span = *self.source_map.get(&self.error.pc).unwrap();
+
+        let label = format!("{}", self.error.source);
+
+        writeln!(
+            f,
+            "{}",
+            SourceErrorRenderHelper {
+                label: Some(RenderLabel::Error(&label)),
+                filepath: self.filepath,
+                source: self.source,
+
+                main_span: span,
+                spans: &[(
+                    span,
+                    Some(RenderLabel::Info("while executing this instruction"))
+                )],
+
+                notes: &[],
+            }
+        )
+    }
+}
+
+pub struct SourceErrorRenderHelper<'a> {
     label: Option<RenderLabel<'a>>,
     filepath: &'a str,
     source: &'a SourceBuffer<'a>,
@@ -169,7 +199,7 @@ struct InterpreterErrorRenderHelper<'a> {
 
     notes: &'a [&'a str],
 }
-impl<'a> fmt::Display for InterpreterErrorRenderHelper<'a> {
+impl<'a> fmt::Display for SourceErrorRenderHelper<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use colored::Colorize;
 

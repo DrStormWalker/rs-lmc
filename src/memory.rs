@@ -148,7 +148,9 @@ use crate::instruction::{Inst, OpCode, Value};
 
 #[derive(Debug, Error)]
 pub enum MemoryError {
-    #[error("Address `{0}` is outside the range of valid addresses, `0-{1}`")]
+    #[error(
+        "attempted to access address `{0}` which outside the range of valid addresses, `0-{1}`"
+    )]
     AddrOutOfRange(usize, usize),
 }
 
