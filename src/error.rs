@@ -8,10 +8,10 @@ use crate::{
     span::{RenderLabel, SourceBuffer, Span},
 };
 
-pub type InterpreterResult<'a, T> = Result<T, InterpreterError<'a>>;
+pub type CompilerResult<'a, T> = Result<T, CompilerError<'a>>;
 
 #[derive(Clone, Debug, Error)]
-pub enum InterpreterError<'a> {
+pub enum CompilerError<'a> {
     #[error("Unexpected tokens")]
     UnexpectedTokens(Span),
 
@@ -30,7 +30,7 @@ pub enum InterpreterError<'a> {
     #[error("Use of undefined label")]
     UndefinedLabel(&'a str, Span),
 }
-impl<'a> InterpreterError<'a> {
+impl<'a> CompilerError<'a> {
     pub fn render(
         self,
         source: &'a SourceBuffer,
@@ -45,14 +45,14 @@ impl<'a> InterpreterError<'a> {
 }
 
 pub struct InterpreterErrorRenderer<'a> {
-    error: InterpreterError<'a>,
+    error: CompilerError<'a>,
     source: &'a SourceBuffer<'a>,
     filepath: &'a str,
 }
 impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.error {
-            InterpreterError::UnexpectedTokens(span) => write!(
+            CompilerError::UnexpectedTokens(span) => write!(
                 f,
                 "{}",
                 InterpreterErrorRenderHelper {
@@ -66,7 +66,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                     notes: &["each instruction can only contain at most a label, an opcode, and an operand"],
                 }
             ),
-            InterpreterError::ExpectedOpCode(span) => write!(
+            CompilerError::ExpectedOpCode(span) => write!(
                 f,
                 "{}",
                 InterpreterErrorRenderHelper {
@@ -80,7 +80,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                     notes: &["each instruction must contain an opcode"],
                 }
             ),
-            InterpreterError::OperandParseError(span, ref e) => match e {
+            CompilerError::OperandParseError(span, ref e) => match e {
                 OperandParseError::InvalidIntegerLiteral(e) => write!(
                     f,
                     "{}",
@@ -110,7 +110,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                     },
                 ),
             },
-            InterpreterError::InvalidLabel(label, span) => write!(
+            CompilerError::InvalidLabel(label, span) => write!(
                 f,
                 "{}",
                 InterpreterErrorRenderHelper {
@@ -124,7 +124,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                     notes: &[&format!("opcodes, such as `{}`, cannot be used as labels", label)]
                 },
             ),
-            InterpreterError::DuplicateLabel(label, first, again) => write!(
+            CompilerError::DuplicateLabel(label, first, again) => write!(
                 f,
                 "{}",
                 InterpreterErrorRenderHelper {
@@ -141,7 +141,7 @@ impl<'a> fmt::Display for InterpreterErrorRenderer<'a> {
                     notes: &[],
                 }
             ),
-            InterpreterError::UndefinedLabel(label, span) => write!(
+            CompilerError::UndefinedLabel(label, span) => write!(
                 f,
                 "{}",
                 InterpreterErrorRenderHelper {

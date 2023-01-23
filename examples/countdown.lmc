@@ -6,5 +6,5 @@ loop    OUT
         BRP loop
         HLT
 		
-count   DAT 1
-one     DAT
+count   DAT
+one     DAT 1

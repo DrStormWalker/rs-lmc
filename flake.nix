@@ -15,18 +15,30 @@
       url = "github:rustsec/advisory-db";
       flake = false;
     };
+    
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, advisory-db, ... }:
+  outputs = { self, nixpkgs, crane, flake-utils, advisory-db, rust-overlay, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
+
+          overlays = [ (import rust-overlay) ];
         };
 
         inherit (pkgs) lib;
 
-        craneLib = crane.lib.${system};
+        rustNightly = pkgs.rust-bin.nightly.latest.default;
+
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustNightly;
         src = craneLib.cleanCargoSource ./.;
 
         buildInputs = [
@@ -105,8 +117,8 @@
 
           # Extra inputs can be added here
           nativeBuildInputs = with pkgs; [
+            rustNightly
             cargo
-            rustc
 
             clippy
             rustfmt
