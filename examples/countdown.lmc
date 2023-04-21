@@ -5,7 +5,7 @@ loop    OUT
         STA count
         BRP loop
         HLT
-		
-one     DAT 1
+
+		one     DAT 1
 count   DAT 
   

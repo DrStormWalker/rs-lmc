@@ -4,13 +4,13 @@ use std::iter;
 use thiserror::Error;
 
 use crate::{
-    compiler::SourceMap,
+    assembler::SourceMap,
     instruction::OperandParseError,
-    interpreter::{InterpreterError, InterpreterErrorSource},
+    interpreter::InterpreterError,
     span::{RenderLabel, SourceBuffer, Span},
 };
 
-pub type CompilerResult<'a, T> = Result<T, CompilerError<'a>>;
+pub type CompilerResult<'a, T> = Result<T, Vec<CompilerError<'a>>>;
 
 #[derive(Clone, Debug, Error)]
 pub enum CompilerError<'a> {
@@ -31,6 +31,12 @@ pub enum CompilerError<'a> {
 
     #[error("Use of undefined label")]
     UndefinedLabel(&'a str, Span),
+
+    #[error("Invalid character `{0}`")]
+    InvalidCharacter(&'a str, Span),
+
+    #[error("Unreachable condition")]
+    UnreachableCondition(Span),
 }
 impl<'a> CompilerError<'a> {
     pub fn render(self, source: &'a SourceBuffer, filepath: &'a str) -> CompileErrorRenderer<'a> {
@@ -152,6 +158,32 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
 
                     notes: &[],
                 }
+            ),
+            CompilerError::InvalidCharacter(character, span) => write!(
+                f,
+                "{}",
+                SourceErrorRenderHelper {
+                    label: Some(RenderLabel::Error(&format!("invalid character `{}`", character))),
+                    filepath: self.filepath,
+                    source: self.source,
+
+                    main_span: span,
+                    spans: &[(span, Some(RenderLabel::Error("invalid character")))],
+                    notes: &[],
+                }
+            ),
+            CompilerError::UnreachableCondition(span) => write!(
+                f,
+                "{}",
+                SourceErrorRenderHelper {
+                    label: Some(RenderLabel::Error(&format!("internal unreachable condition ocurred"))),
+                    filepath: self.filepath,
+                    source: self.source,
+
+                    main_span: span,
+                    spans: &[(span, Some(RenderLabel::Info("caused by this token")))],
+                    notes: &["This is likely caused by a bug, please report this to the maintainer"],
+                }
             )
         }
     }
@@ -206,7 +238,7 @@ impl<'a> fmt::Display for SourceErrorRenderHelper<'a> {
         let padding_width = self
             .spans
             .iter()
-            .map(|(s, _)| s.line.to_string().len())
+            .map(|(s, _)| (s.line + 1).to_string().len())
             .max()
             .unwrap_or(0);
 
@@ -221,7 +253,7 @@ impl<'a> fmt::Display for SourceErrorRenderHelper<'a> {
             padding,
             "-->".bright_blue().bold(),
             self.filepath,
-            self.main_span.line,
+            self.main_span.line + 1,
             self.main_span.start,
         )?;
 

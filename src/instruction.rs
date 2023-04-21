@@ -5,11 +5,12 @@ use std::{
 };
 
 use cached::{proc_macro::cached, SizedCache};
-use lazy_static::lazy_static;
-use regex::Regex;
 use thiserror::Error;
 
-use crate::{compiler::Token, span::Span};
+use crate::{
+    assembler::tokenizer::{Token, IDENT_RE, NUMBER_START_RE},
+    span::Span,
+};
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum OpCode {
@@ -78,12 +79,7 @@ pub(crate) enum OperandValue<'a> {
 }
 impl<'a> OperandValue<'a> {
     pub fn lifetime_from_str(s: &'a str) -> Result<Self, OperandParseError> {
-        lazy_static! {
-            static ref LABEL_RE: Regex = Regex::new("^[a-zA-Z_][a-zA-Z_0-9]*$").unwrap();
-            static ref NUMBER_START_RE: Regex = Regex::new("^[0-9]").unwrap();
-        }
-
-        if !LABEL_RE.is_match(s) {
+        if !IDENT_RE.is_match(s) {
             if !NUMBER_START_RE.is_match(s) {
                 return Err(OperandParseError::InvalidLabel(s.to_string()));
             }
@@ -161,9 +157,9 @@ impl<E, T: FromStr<Err = E>> FromStr for Operand<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RawInst<'a> {
-    pub(crate) label: Option<Token<'a>>,
-    pub(crate) opcode: (Span, OpCode),
+pub struct RawInst<'a> {
+    pub label: Option<Token<'a>>,
+    pub opcode: (Span, OpCode),
     pub(crate) operand: Option<(Span, Operand<OperandValue<'a>>)>,
 }
 

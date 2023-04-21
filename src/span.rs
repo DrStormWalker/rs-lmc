@@ -30,7 +30,13 @@ impl<'a> SourceBuffer<'a> {
         let line_pos = *self.lines.get(line)?;
         let line_end = *self.lines.get(line + 1).unwrap_or(&self.source.len());
 
-        Some(&self.source[line_pos + 1..line_end])
+        let line_pos = if line_pos == 0 {
+            line_pos
+        } else {
+            line_pos + 1
+        };
+
+        Some(&self.source[line_pos..line_end])
     }
 
     pub fn get_lines(&self, span: Span) -> Option<&str> {
@@ -146,7 +152,7 @@ impl<'a, 'b> fmt::Display for SpanRenderer<'a, 'b> {
 
         let line = self.source.get_line(self.span.line).unwrap();
 
-        let line_number = format!("{}", self.span.line);
+        let line_number = format!("{}", self.span.line + 1);
 
         write!(
             f,

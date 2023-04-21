@@ -1,4 +1,4 @@
-mod compiler;
+mod assembler;
 mod error;
 mod instruction;
 mod interpreter;
@@ -11,13 +11,11 @@ use std::{
     path::PathBuf,
 };
 
+use assembler::assemble_lmc_asm;
 use clap::{Args, Parser, Subcommand};
-use compiler::compile_lmc_asm_with_source_map;
-use error::{CompilerError, InterpreterErrorRenderer, SourceErrorRenderHelper};
-use interpreter::{InterpreterError, Vm};
-use memory::MemoryError;
+use error::InterpreterErrorRenderer;
+use interpreter::Vm;
 use span::SourceBuffer;
-use thiserror::Error;
 
 use crate::memory::{DynamicMemoryStorage, MemoryStorage};
 
@@ -43,12 +41,14 @@ fn run<'a>(args: &RunArgs, asm: &'a str) -> Option<()> {
 
     let filepath = args.filepath.display().to_string();
 
-    let (insts, source_map) = match compile_lmc_asm_with_source_map(&source.source()) {
+    let (insts, source_map) = match assemble_lmc_asm(&source.source()) {
         Ok((insts, source_map)) => (insts, source_map),
         Err(e) => {
-            let render = e.render(&source, &filepath);
+            for e in e {
+                let render = e.render(&source, &filepath);
 
-            println!("{}", render);
+                println!("{}", render);
+            }
 
             return None;
         }
@@ -57,7 +57,7 @@ fn run<'a>(args: &RunArgs, asm: &'a str) -> Option<()> {
     let mut memory = DynamicMemoryStorage::<String>::new();
 
     for (i, inst) in insts.into_iter().enumerate() {
-        if let Err(e) = memory.set_inst(i, inst) {
+        if let Err(_) = memory.set_inst(i, inst) {
             todo!();
         }
     }
