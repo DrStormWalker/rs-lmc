@@ -4,7 +4,7 @@ use std::iter;
 use thiserror::Error;
 
 use crate::{
-    assembler::SourceMap,
+    assembler::{tokenizer::TokenType, SourceMap},
     instruction::OperandParseError,
     interpreter::InterpreterError,
     span::{RenderLabel, SourceBuffer, Span},
@@ -37,6 +37,16 @@ pub enum CompilerError<'a> {
 
     #[error("Unreachable condition")]
     UnreachableCondition(Span),
+
+    #[error("Invalid token `{token}`")]
+    InvalidToken {
+        token: &'a str,
+        span: Span,
+        expected: Vec<&'static str>,
+    },
+
+    #[error("Expected a token")]
+    ExpectedToken(Span, Vec<&'static str>),
 }
 impl<'a> CompilerError<'a> {
     pub fn render(self, source: &'a SourceBuffer, filepath: &'a str) -> CompileErrorRenderer<'a> {
@@ -123,7 +133,7 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     source: self.source,
 
                     main_span: span,
-                    spans: &[(span, Some(RenderLabel::Error("")))],
+                    spans: &[(span, Some(RenderLabel::Error("here")))],
 
                     notes: &[&format!("opcodes, such as `{}`, cannot be used as labels", label)]
                 },
@@ -183,6 +193,38 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     main_span: span,
                     spans: &[(span, Some(RenderLabel::Info("caused by this token")))],
                     notes: &["This is likely caused by a bug, please report this to the maintainer"],
+                }
+            ),
+            CompilerError::InvalidToken { token, span, ref expected } => write!(
+                f,
+                "{}",
+                SourceErrorRenderHelper {
+                    label: Some(RenderLabel::Error(&format!("invalid token `{}`", token))),
+                    filepath: self.filepath,
+                    source: self.source,
+
+                    main_span: span,
+                    spans: &[(span, Some(RenderLabel::Info("here")))],
+                    notes: &[&format!(
+                        "Expected one of: {}",
+                        expected.iter().map(|type_| format!("{}", type_)).collect::<Vec<String>>().join(", "),
+                    )],
+                }
+            ),
+            CompilerError::ExpectedToken(span, ref expected) => write!(
+                f,
+                "{}",
+                SourceErrorRenderHelper {
+                    label: Some(RenderLabel::Error("Expected a token")),
+                    filepath: self.filepath,
+                    source: self.source,
+
+                    main_span: span,
+                    spans: &[(span, Some(RenderLabel::Info("here")))],
+                    notes: &[&format!(
+                        "Expected one of: {}",
+                        expected.iter().map(|type_| format!("{}", type_)).collect::<Vec<String>>().join(", "),
+                    )],
                 }
             )
         }

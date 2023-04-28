@@ -8,11 +8,13 @@ use crate::{
 
 use self::{
     labels::process_labels,
+    macros::expand_lmc_macros,
     parser::parse_lmc_asm,
     tokenizer::{tokenize_lmc_asm, TokenType},
 };
 
 pub mod labels;
+pub mod macros;
 pub mod parser;
 pub mod tokenizer;
 
@@ -41,6 +43,8 @@ fn generate_source_map<'a>(insts: &[RawInst<'a>]) -> SourceMap {
 pub fn assemble_lmc_asm<'a>(asm: &'a str) -> CompilerResult<(Vec<Inst>, SourceMap)> {
     let tokens = tokenize_lmc_asm(asm)?;
 
+    let tokens = expand_lmc_macros(tokens);
+
     let tokens = {
         let mut new_tokens = vec![];
         let mut line_tokens = vec![];
@@ -56,7 +60,14 @@ pub fn assemble_lmc_asm<'a>(asm: &'a str) -> CompilerResult<(Vec<Inst>, SourceMa
 
         new_tokens
             .into_iter()
-            .filter(|line| line.len() > 0)
+            .enumerate()
+            .filter_map(|(i, line)| {
+                if line.len() > 0 {
+                    Some((i, line))
+                } else {
+                    None
+                }
+            })
             .collect()
     };
 

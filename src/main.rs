@@ -1,3 +1,5 @@
+#![feature(exact_size_is_empty)]
+
 mod assembler;
 mod error;
 mod instruction;
@@ -89,6 +91,8 @@ fn main() -> Result<(), io::Error> {
             File::open(&run_args.filepath)
                 .unwrap()
                 .read_to_string(&mut asm)?;
+
+            let asm = asm.replace("\t", "    ");
 
             run(run_args, &asm);
         }

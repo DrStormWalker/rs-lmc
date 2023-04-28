@@ -1,3 +1,5 @@
+use core::fmt;
+
 use regex::Regex;
 
 use crate::{
@@ -10,7 +12,7 @@ lazy_static::lazy_static! {
     pub static ref NUMBER_START_RE: Regex = Regex::new("^[0-9]").unwrap();
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TokenType {
     SemiColon,
     Percent,
@@ -51,6 +53,32 @@ impl TokenType {
         }
     }
 }
+impl fmt::Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::SemiColon => ";",
+                Self::Percent => "%",
+                Self::LBracket => "(",
+                Self::RBracket => ")",
+                Self::LSquare => "[",
+                Self::RSquare => "]",
+                Self::LCurly => "{",
+                Self::RCurly => "}",
+                Self::At => "@",
+                Self::Hash => "#",
+                Self::Comma => ",",
+                Self::Colon => ":",
+                Self::Equal => "=",
+                Self::LineEnd => "end of line",
+                Self::Ident => "identifier",
+                Self::Literal => "literal",
+            }
+        )
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Token<'a> {
@@ -65,6 +93,7 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
     let mut errors = vec![];
     let mut tokens = vec![];
     let mut line_number = 0;
+    let mut line_start = 0;
 
     while let Some((j, char)) = iter.next() {
         match char {
@@ -72,16 +101,26 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
                 tokens.push(Token {
                     type_: TokenType::LineEnd,
                     source: &asm[j..=j],
-                    span: Span::new(j, j + 1, line_number),
+                    span: Span::new(j - line_start, j - line_start + 1, line_number),
                 });
                 line_number += 1;
+                line_start = j + 1;
             }
-            ';' | '%' | '(' | ')' | '[' | ']' | '{' | '}' | '@' | '#' | ',' | ':' | '=' => tokens
-                .push(Token {
+            ';' => {
+                let start = j;
+                let mut end = j;
+
+                while let Some((j, _)) = iter.next_if(|(_, char)| *char != '\n') {
+                    end = j;
+                }
+            }
+            '%' | '(' | ')' | '[' | ']' | '{' | '}' | '@' | '#' | ',' | ':' | '=' => {
+                tokens.push(Token {
                     type_: TokenType::try_from_char(char).unwrap(),
                     source: &asm[j..=j],
-                    span: Span::new(j, j + 1, line_number),
-                }),
+                    span: Span::new(j - line_start, j - line_start + 1, line_number),
+                })
+            }
             c if c.is_alphabetic() => {
                 let start = j;
                 let mut end = j;
@@ -95,7 +134,7 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
                 tokens.push(Token {
                     type_: TokenType::Ident,
                     source: &asm[start..end + 1],
-                    span: Span::new(start, end + 1, line_number),
+                    span: Span::new(start - line_start, end - line_start + 1, line_number),
                 })
             }
             c if c.is_ascii_digit() => {
@@ -109,13 +148,13 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
                 tokens.push(Token {
                     type_: TokenType::Literal,
                     source: &asm[start..end + 1],
-                    span: Span::new(start, end + 1, line_number),
+                    span: Span::new(start - line_start, end - line_start + 1, line_number),
                 })
             }
             c if c.is_whitespace() => {}
             _ => errors.push(CompilerError::InvalidCharacter(
                 &asm[j..=j],
-                Span::new(j, j + 1, line_number),
+                Span::new(j - line_start, j - line_start + 1, line_number),
             )),
         }
     }
