@@ -110,6 +110,14 @@ impl<'a> OperandValue<'a> {
         }
     }
 }
+impl<'a> ToString for OperandValue<'a> {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Label(label) => label.to_string(),
+            Self::Value(value) => value.to_string(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Error)]
 pub enum OperandParseError {

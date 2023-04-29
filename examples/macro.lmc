@@ -1,20 +1,203 @@
+; Example: Macros
+
+; There are some macros built-in the assembler to
+; make the Little Man Computer instruction set feel
+; more like a traditional assembly language.
+;
+; The built-in macros are as follows:
+;
+; - `%init`:
+;   creates a stack and call stack and initialises
+;   some other values and subprocedures, for example
+;   the `%ret` macro uses a subprocedure defined by
+;   the `%init` macro.
+;   See full usage below.
+;   NOTE: Must be used at the start of the program.
+;
+; - `%_start`:
+;   Automatically breaks to the label `_start`.
+;
+; - `%LABEL_NAME:`:
+;   `LABEL_NAME` should be replaced with the name of the
+;   label you wish to create.
+;   Create a label with the specified name, allowing for
+;   more traditional assembly labels.
+;
+; - `%push`:
+;   Push the value currently stored in the accumulator
+;   onto the stack.
+;   NOTE: This does not modify the accumulator value.
+;   NOTE: No stack pointer checks occur and this macro
+;         CAN cause a stack overflow if used carelessly.
+;
+; - `%pop`:
+;   Pop the value currently at the top of the stack into
+;   the accumulator.
+;   NOTE: No stack pointer checks occur and this macro
+;         CAN cause a stack underflow if used carelessly.
+;
+; - `%bsub( SUBPROCEDURE_LABEL )`:
+;   `SUBPRCOEDURE_LABEL` should be replaced with the label
+;   of the subprocedure you wish to break to.
+;   Break to the specified subprocedure, pushing the
+;   return address onto the call stack.
+;   NOTE: Similarly to `%push` this CAN cause a call
+;         stack overflow if used carelessly.
+;
+; - `%ret`:
+;   Break to the address at the top of the call stack.
+;   Used to return from subprocedures.
+;   NOTE: Similarly to `%pop` this CAN cause a call
+;         stack underflowif used carelessly.
+;
+
+; The stack can store 4 values
+; There can be no recursive function calls
 %init(
-	stack size      = 4,
+	stack size      = 2,
 	call stack size = 1,
 )
+
+; Break to the _start subprocedure
 %_start
 
+; Define a function labeled `print`
+%print:
+	; Take the parameter from the stack putting it
+	; in the accumulator
+	%pop
+
+	; Output it
+	OUT
+
+	; Then return
+	%ret
+
 %_start:
+	; Push the immediate value `1` onto the
+	; stack as the argument for the `print` function
 	LDA #1
 	%push
+
+	; Call the print function
+	%bsub( print )
+
+	; Push the immediate values `2`, `3` onto the
+	; stack as the arguments for successive calls
+	; of the `print` function
 	LDA #2
 	%push
+	LDA #3
+	%push
 
+	; Print `3`
 	%bsub( print )
+	; Print `2`
 	%bsub( print )
+
+	; Output "4"
+	LDA #4
+	OUT
+	
 	HLT
 
-%print:
-	%pop
-	OUT
-	%ret
+; The above LMC Assembly can be expanded and run using
+; the command
+;
+; ```sh
+; $ rs-lmc assemble examples/macro.lmc
+; ```
+;
+; Giving the following result:
+;
+; ```lmc
+;
+;                                 LDA  #STACK
+;                                 STA  STACK_PTR
+;                                 LDA  #CALL_STACK
+;                                 STA  CALL_STACK_PTR
+;                                 BRA  _f5d51ec80d012e60_init_end
+; STACK_PTR                       DAT  STACK
+; CALL_STACK_PTR                  DAT  CALL_STACK
+; STACK                           DAT
+; _f5d51ec80d012e60_stack_1       DAT
+; CALL_STACK                      DAT
+; _f5d51ec80d012e60_call_stack_1  DAT
+; _ret                            STA  _f5d51ec80d012e60_tmp
+;                                 LDA  CALL_STACK_PTR
+;                                 SUB  #1
+;                                 STA  CALL_STACK_PTR
+;                                 LDA  @CALL_STACK_PTR
+;                                 STA  _f5d51ec80d012e60_ptr
+;                                 LDA  _f5d51ec80d012e60_tmp
+;                                 BRA  @_f5d51ec80d012e60_ptr
+; _f5d51ec80d012e60_tmp           DAT
+; _f5d51ec80d012e60_ptr           DAT
+; _f5d51ec80d012e60_init_end      ADD  #0
+;                                 BRA  _start
+; print                           ADD  #0
+;                                 LDA  STACK_PTR
+;                                 SUB  #1
+;                                 STA  STACK_PTR
+;                                 LDA  @STACK_PTR
+;                                 OUT
+;                                 BRA  _ret
+; _start                          ADD  #0
+;                                 LDA  #1
+;                                 STA  _11b670162a88e6a_tmp
+;                                 STA  @STACK_PTR
+;                                 LDA  STACK_PTR
+;                                 ADD  #1
+;                                 STA  STACK_PTR
+;                                 BRA  _11b670162a88e6a_end
+; _11b670162a88e6a_tmp            DAT
+; _11b670162a88e6a_end            LDA  _11b670162a88e6a_tmp
+;                                 LDA  #_60d1d6fdd6ad7948_end
+;                                 STA  @CALL_STACK_PTR
+;                                 LDA  CALL_STACK_PTR
+;                                 ADD  #1
+;                                 STA  CALL_STACK_PTR
+;                                 BRA  print
+; _60d1d6fdd6ad7948_end           ADD  #0
+;                                 LDA  #2
+;                                 STA  _2a01117545706639_tmp
+;                                 STA  @STACK_PTR
+;                                 LDA  STACK_PTR
+;                                 ADD  #1
+;                                 STA  STACK_PTR
+;                                 BRA  _2a01117545706639_end
+; _2a01117545706639_tmp           DAT
+; _2a01117545706639_end           LDA  _2a01117545706639_tmp
+;                                 LDA  #3
+;                                 STA  _41577f94951aff7c_tmp
+;                                 STA  @STACK_PTR
+;                                 LDA  STACK_PTR
+;                                 ADD  #1
+;                                 STA  STACK_PTR
+;                                 BRA  _41577f94951aff7c_end
+; _41577f94951aff7c_tmp           DAT
+; _41577f94951aff7c_end           LDA  _41577f94951aff7c_tmp
+;                                 LDA  #_6ea6ba5de9f984ca_end
+;                                 STA  @CALL_STACK_PTR
+;                                 LDA  CALL_STACK_PTR
+;                                 ADD  #1
+;                                 STA  CALL_STACK_PTR
+;                                 BRA  print
+; _6ea6ba5de9f984ca_end           ADD  #0
+;                                 LDA  #_da5cef6ece06e729_end
+;                                 STA  @CALL_STACK_PTR
+;                                 LDA  CALL_STACK_PTR
+;                                 ADD  #1
+;                                 STA  CALL_STACK_PTR
+;                                 BRA  print
+; _da5cef6ece06e729_end           ADD  #0
+;                                 LDA  #4
+;                                 OUT
+;                                 HLT
+;
+; ```
+;
+; This code can be run in te 101computing.net [interpreter](https://101computing.net/LMC/)
+; It may also run in other interpreters but none others have been tested
+;
+
