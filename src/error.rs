@@ -1,5 +1,5 @@
 use core::fmt;
-use std::iter;
+use std::{iter, marker::PhantomData};
 
 use thiserror::Error;
 
@@ -18,7 +18,7 @@ pub enum CompilerError<'a> {
     UnexpectedTokens(Span),
 
     #[error("Invalid label name")]
-    InvalidLabel(&'a str, Span),
+    InvalidLabel(String, Span),
 
     #[error("Expected opcode")]
     ExpectedOpCode(Span),
@@ -27,26 +27,29 @@ pub enum CompilerError<'a> {
     OperandParseError(Span, OperandParseError),
 
     #[error("Duplicate label `{0}`")]
-    DuplicateLabel(&'a str, Span, Span),
+    DuplicateLabel(String, Span, Span),
 
     #[error("Use of undefined label")]
-    UndefinedLabel(&'a str, Span),
+    UndefinedLabel(String, Span),
 
     #[error("Invalid character `{0}`")]
-    InvalidCharacter(&'a str, Span),
+    InvalidCharacter(String, Span),
 
     #[error("Unreachable condition")]
     UnreachableCondition(Span),
 
     #[error("Invalid token `{token}`")]
     InvalidToken {
-        token: &'a str,
+        token: String,
         span: Span,
         expected: Vec<&'static str>,
     },
 
     #[error("Expected a token")]
     ExpectedToken(Span, Vec<&'static str>),
+
+    #[error("Phantom data")]
+    Phantom(PhantomData<&'a ()>),
 }
 impl<'a> CompilerError<'a> {
     pub fn render(self, source: &'a SourceBuffer, filepath: &'a str) -> CompileErrorRenderer<'a> {
@@ -124,7 +127,7 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     },
                 ),
             },
-            CompilerError::InvalidLabel(label, span) => write!(
+            CompilerError::InvalidLabel(ref label, span) => write!(
                 f,
                 "{}",
                 SourceErrorRenderHelper {
@@ -138,7 +141,7 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     notes: &[&format!("opcodes, such as `{}`, cannot be used as labels", label)]
                 },
             ),
-            CompilerError::DuplicateLabel(label, first, again) => write!(
+            CompilerError::DuplicateLabel(ref label, first, again) => write!(
                 f,
                 "{}",
                 SourceErrorRenderHelper {
@@ -155,7 +158,7 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     notes: &[],
                 }
             ),
-            CompilerError::UndefinedLabel(label, span) => write!(
+            CompilerError::UndefinedLabel(ref label, span) => write!(
                 f,
                 "{}",
                 SourceErrorRenderHelper {
@@ -169,7 +172,7 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     notes: &[],
                 }
             ),
-            CompilerError::InvalidCharacter(character, span) => write!(
+            CompilerError::InvalidCharacter(ref character, span) => write!(
                 f,
                 "{}",
                 SourceErrorRenderHelper {
@@ -195,7 +198,7 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                     notes: &["This is likely caused by a bug, please report this to the maintainer"],
                 }
             ),
-            CompilerError::InvalidToken { token, span, ref expected } => write!(
+            CompilerError::InvalidToken { ref token, span, ref expected } => write!(
                 f,
                 "{}",
                 SourceErrorRenderHelper {
@@ -226,7 +229,8 @@ impl<'a> fmt::Display for CompileErrorRenderer<'a> {
                         expected.iter().map(|type_| format!("{}", type_)).collect::<Vec<String>>().join(", "),
                     )],
                 }
-            )
+            ),
+            CompilerError::Phantom(_) => unreachable!(),
         }
     }
 }
@@ -296,7 +300,7 @@ impl<'a> fmt::Display for SourceErrorRenderHelper<'a> {
             "-->".bright_blue().bold(),
             self.filepath,
             self.main_span.line + 1,
-            self.main_span.start,
+            self.main_span.start + 1,
         )?;
 
         writeln!(f, "{} {}", padding, "|".bright_blue().bold())?;

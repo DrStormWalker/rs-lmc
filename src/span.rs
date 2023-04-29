@@ -12,7 +12,7 @@ impl<'a> SourceBuffer<'a> {
         let mut almost_lines = source
             .chars()
             .enumerate()
-            .filter_map(|(i, c)| if c == '\n' { Some(i) } else { None })
+            .filter_map(|(i, c)| if c == '\n' { Some(i + 1) } else { None })
             .collect();
 
         let mut lines = vec![0];
@@ -28,13 +28,11 @@ impl<'a> SourceBuffer<'a> {
 
     pub fn get_line(&self, line: usize) -> Option<&str> {
         let line_pos = *self.lines.get(line)?;
-        let line_end = *self.lines.get(line + 1).unwrap_or(&self.source.len());
-
-        let line_pos = if line_pos == 0 {
-            line_pos
-        } else {
-            line_pos + 1
-        };
+        let line_end = self
+            .lines
+            .get(line + 1)
+            .map(|l| *l - 1)
+            .unwrap_or(self.source.len());
 
         Some(&self.source[line_pos..line_end])
     }
@@ -47,7 +45,7 @@ impl<'a> SourceBuffer<'a> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash)]
 pub struct Span {
     pub(crate) start: usize,
     pub(crate) end: usize,

@@ -31,6 +31,9 @@ struct Cli {
 #[derive(Args, Debug)]
 struct RunArgs {
     filepath: PathBuf,
+
+    #[arg(long, default_value_t = false)]
+    print_expanded: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -43,7 +46,7 @@ fn run<'a>(args: &RunArgs, asm: &'a str) -> Option<()> {
 
     let filepath = args.filepath.display().to_string();
 
-    let (insts, source_map) = match assemble_lmc_asm(&source.source()) {
+    let (insts, source_map) = match assemble_lmc_asm(&source.source(), args.print_expanded) {
         Ok((insts, source_map)) => (insts, source_map),
         Err(e) => {
             for e in e {

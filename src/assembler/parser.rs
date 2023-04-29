@@ -1,19 +1,20 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use crate::{
     error::{CompilerError, CompilerResult},
-    instruction::{OpCode, Operand, OperandParseError, RawInst},
+    instruction::{OpCode, Operand, OperandParseError, OperandValue, RawInst},
     span::Span,
 };
 
 use super::tokenizer::{Token, TokenType};
 
+#[derive(Debug)]
 pub struct Symbol<'a> {
     pub token: Token<'a>,
     pub addr: usize,
 }
 
-pub type SymbolTable<'a> = HashMap<&'a str, Symbol<'a>>;
+pub type SymbolTable<'a> = HashMap<String, Symbol<'a>>;
 
 pub fn parse_lmc_instruction<'a>(
     tokens: Vec<Token<'a>>,
@@ -27,7 +28,7 @@ pub fn parse_lmc_instruction<'a>(
 
     if token.type_ != TokenType::Ident {
         return Err(vec![CompilerError::InvalidToken {
-            token: token.source,
+            token: token.source.to_string(),
             span: token.span,
             expected: vec!["label", "opcode"],
         }]);
@@ -36,17 +37,15 @@ pub fn parse_lmc_instruction<'a>(
     let (opcode, label) = if let Ok(op) = token.source.parse::<OpCode>() {
         ((token.span, op), None)
     } else {
-        let label = Some(*token);
+        let label = Some(token);
 
         let token = token_iter
             .next()
             .ok_or(vec![CompilerError::ExpectedOpCode(Span::new(
                 token.span.end + 1,
                 token.span.end + 4,
-                line,
+                token.span.line,
             ))])?;
-
-        println!("{:?}", token);
 
         let Ok(op) = token.source.parse::<OpCode>() else {
             return Err(vec![CompilerError::ExpectedOpCode(token.span)]);
@@ -57,14 +56,17 @@ pub fn parse_lmc_instruction<'a>(
 
     let Some(token) = token_iter.next() else {
         return Ok(RawInst {
-            label,
+            label: label.cloned(),
             opcode,
             operand: None,
         });
     };
 
     if let Ok(_) = token.source.parse::<OpCode>() {
-        return Err(vec![CompilerError::InvalidLabel(token.source, token.span)]);
+        return Err(vec![CompilerError::InvalidLabel(
+            token.source.to_string(),
+            token.span,
+        )]);
     }
 
     match token.type_ {
@@ -82,15 +84,21 @@ pub fn parse_lmc_instruction<'a>(
                 TokenType::Literal | TokenType::Ident => {}
                 _ => {
                     return Err(vec![CompilerError::InvalidToken {
-                        token: token.source,
+                        token: token.source.to_string(),
                         span: token.span,
                         expected: vec!["literal", "label"],
                     }])
                 }
             }
 
-            let operand = Operand::lifetime_from_str(token.source)
+            let operand = OperandValue::lifetime_from_str(token.source.clone())
                 .map_err(|e| vec![CompilerError::OperandParseError(token.span, e)])?;
+
+            let operand = match prefix.type_ {
+                TokenType::At => Operand::Indirect(operand),
+                TokenType::Hash => Operand::Immediate(operand),
+                _ => unreachable!(),
+            };
 
             if !token_iter.is_empty() {
                 let next = token_iter.next().unwrap();
@@ -103,7 +111,7 @@ pub fn parse_lmc_instruction<'a>(
             }
 
             Ok(RawInst {
-                label,
+                label: label.cloned(),
                 opcode,
                 operand: Some((token.span, operand)),
             })
@@ -120,17 +128,17 @@ pub fn parse_lmc_instruction<'a>(
             }
 
             Ok(RawInst {
-                label,
+                label: label.cloned(),
                 opcode,
                 operand: Some((
                     token.span,
-                    Operand::lifetime_from_str(token.source)
+                    Operand::lifetime_from_str(token.source.clone())
                         .map_err(|e| vec![CompilerError::OperandParseError(token.span, e)])?,
                 )),
             })
         }
         _ => Err(vec![CompilerError::InvalidToken {
-            token: token.source,
+            token: token.source.to_string(),
             span: token.span,
             expected: vec!["'@'", "'#'", "literal", "label"],
         }]),
@@ -154,10 +162,10 @@ pub fn parse_lmc_asm<'a>(
             }
         };
 
-        if let Some(label) = inst.label {
-            if let Some(other) = symbol_table.get(label.source) {
+        if let Some(label) = inst.label.clone() {
+            if let Some(other) = symbol_table.get(&label.source[..]) {
                 errors.push(CompilerError::DuplicateLabel(
-                    label.source,
+                    label.source.to_string(),
                     other.token.span,
                     label.span,
                 ));
@@ -166,13 +174,13 @@ pub fn parse_lmc_asm<'a>(
             }
 
             symbol_table.insert(
-                label.source,
+                label.source.to_string(),
                 Symbol {
                     token: label,
                     addr: i,
                 },
             );
-        }
+        };
 
         insts.push(inst);
     }

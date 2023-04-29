@@ -21,7 +21,7 @@ pub fn process_labels<'a>(
                     OperandValue::Label(label) => symbol_table
                         .get(&label[..])
                         .map(|symbol| symbol.addr as i64)
-                        .ok_or_else(|| CompilerError::UndefinedLabel(&label, span)),
+                        .ok_or_else(|| CompilerError::UndefinedLabel(label.to_string(), span)),
                 })
             })
             .transpose()

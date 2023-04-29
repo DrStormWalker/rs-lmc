@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use regex::Regex;
+
 use crate::{
     error::CompilerResult,
     instruction::{Inst, RawInst},
@@ -26,7 +28,7 @@ fn generate_source_map<'a>(insts: &[RawInst<'a>]) -> SourceMap {
     for (i, inst) in insts.iter().enumerate() {
         let mut span = inst.opcode.0;
 
-        if let Some(label) = inst.label {
+        if let Some(label) = &inst.label {
             span = label.span.union(span);
         }
 
@@ -40,16 +42,46 @@ fn generate_source_map<'a>(insts: &[RawInst<'a>]) -> SourceMap {
     map
 }
 
-pub fn assemble_lmc_asm<'a>(asm: &'a str) -> CompilerResult<(Vec<Inst>, SourceMap)> {
+pub fn assemble_lmc_asm<'a>(asm: &'a str, print: bool) -> CompilerResult<(Vec<Inst>, SourceMap)> {
     let tokens = tokenize_lmc_asm(asm)?;
 
-    let tokens = expand_lmc_macros(tokens);
+    let tokens = expand_lmc_macros(tokens)?;
+
+    lazy_static::lazy_static! {
+        static ref REMOVE_SPACE_RE: Regex = Regex::new(r"(?P<tok>[\n#@]) ").unwrap();
+        static ref COLLAPSE_LINE_RE: Regex = Regex::new(r"(\n\s*){2,}").unwrap();
+        static ref TRAILING_WHITESPACE: Regex = Regex::new(r"\s*$").unwrap();
+        static ref PRECEDING_WHITESPACE: Regex = Regex::new(r"^\s*").unwrap();
+    }
+
+    if print {
+        println!(
+            "=== EXPANDED PROGRAM ===\n\n{}\n\n=== END EXPANDED PROGRAM ===\n",
+            REMOVE_SPACE_RE.replace_all(
+                &COLLAPSE_LINE_RE.replace_all(
+                    &TRAILING_WHITESPACE.replace(
+                        &PRECEDING_WHITESPACE.replace(
+                            &tokens
+                                .iter()
+                                .map(|t| &t.source[..])
+                                .collect::<Vec<&str>>()
+                                .join(" "),
+                            "",
+                        ),
+                        "",
+                    ),
+                    "\n\n",
+                ),
+                "$tok"
+            )
+        );
+    }
 
     let tokens = {
         let mut new_tokens = vec![];
         let mut line_tokens = vec![];
         for token in tokens.into_iter() {
-            if let TokenType::LineEnd = token.type_ {
+            if token.type_ == TokenType::LineEnd {
                 new_tokens.push(line_tokens);
                 line_tokens = vec![];
                 continue;
@@ -58,16 +90,12 @@ pub fn assemble_lmc_asm<'a>(asm: &'a str) -> CompilerResult<(Vec<Inst>, SourceMa
             line_tokens.push(token);
         }
 
+        new_tokens.push(line_tokens);
+
         new_tokens
             .into_iter()
+            .filter(|line| line.len() > 0)
             .enumerate()
-            .filter_map(|(i, line)| {
-                if line.len() > 0 {
-                    Some((i, line))
-                } else {
-                    None
-                }
-            })
             .collect()
     };
 

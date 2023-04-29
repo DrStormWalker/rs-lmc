@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     num::ParseIntError,
     ops::{AddAssign, SubAssign},
     str::FromStr,
@@ -50,6 +51,23 @@ impl OpCode {
             Self::Nop => 4,
         }
     }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Hlt => "HLT",
+            Self::Add => "ADD",
+            Self::Sub => "SUB",
+            Self::Sta => "STA",
+            Self::Lda => "LDA",
+            Self::Bra => "BRA",
+            Self::Brz => "BRZ",
+            Self::Brp => "BRP",
+            Self::Inp => "INP",
+            Self::Out => "OUT",
+            Self::Dat => "DAT",
+            Self::Nop => "NOP",
+        }
+    }
 }
 impl FromStr for OpCode {
     type Err = ();
@@ -72,15 +90,15 @@ impl FromStr for OpCode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum OperandValue<'a> {
-    Label(&'a str),
+    Label(Cow<'a, str>),
     Value(i64),
 }
 impl<'a> OperandValue<'a> {
-    pub fn lifetime_from_str(s: &'a str) -> Result<Self, OperandParseError> {
-        if !IDENT_RE.is_match(s) {
-            if !NUMBER_START_RE.is_match(s) {
+    pub fn lifetime_from_str(s: Cow<'a, str>) -> Result<Self, OperandParseError> {
+        if !IDENT_RE.is_match(&s) {
+            if !NUMBER_START_RE.is_match(&s) {
                 return Err(OperandParseError::InvalidLabel(s.to_string()));
             }
 
@@ -121,15 +139,23 @@ impl<T> Operand<T> {
     }
 }
 impl<'a> Operand<OperandValue<'a>> {
-    pub fn lifetime_from_str(s: &'a str) -> Result<Self, OperandParseError> {
+    pub fn lifetime_from_str(s: Cow<'a, str>) -> Result<Self, OperandParseError> {
         if s.starts_with("#") {
             Ok(Operand::Immediate(OperandValue::lifetime_from_str(
-                &s[1..],
+                match s {
+                    Cow::Borrowed(ref s) => Cow::Borrowed(&s[1..]),
+                    Cow::Owned(ref s) => Cow::Owned(s[1..].to_string()),
+                },
             )?))
         } else if s.starts_with("@") {
-            Ok(Operand::Indirect(OperandValue::lifetime_from_str(&s[1..])?))
+            Ok(Operand::Indirect(OperandValue::lifetime_from_str(
+                match s {
+                    Cow::Borrowed(ref s) => Cow::Borrowed(&s[1..]),
+                    Cow::Owned(ref s) => Cow::Owned(s[1..].to_string()),
+                },
+            )?))
         } else {
-            Ok(Operand::Addr(OperandValue::lifetime_from_str(&s[..])?))
+            Ok(Operand::Addr(OperandValue::lifetime_from_str(s)?))
         }
     }
 }
@@ -156,7 +182,7 @@ impl<E, T: FromStr<Err = E>> FromStr for Operand<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RawInst<'a> {
     pub label: Option<Token<'a>>,
     pub opcode: (Span, OpCode),

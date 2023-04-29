@@ -7,8 +7,10 @@ use crate::{
     span::Span,
 };
 
+use std::borrow::Cow;
+
 lazy_static::lazy_static! {
-    pub static ref IDENT_RE: Regex = Regex::new(r"^\p{Alphabetic}[\p{Alphabetic}\d:]*$").unwrap();
+    pub static ref IDENT_RE: Regex = Regex::new(r"^[\p{Alphabetic}_][\p{Alphabetic}\d:_]*$").unwrap();
     pub static ref NUMBER_START_RE: Regex = Regex::new("^[0-9]").unwrap();
 }
 
@@ -80,10 +82,10 @@ impl fmt::Display for TokenType {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Token<'a> {
     pub(crate) type_: TokenType,
-    pub(crate) source: &'a str,
+    pub(crate) source: Cow<'a, str>,
     pub(crate) span: Span,
 }
 
@@ -100,7 +102,7 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
             '\n' => {
                 tokens.push(Token {
                     type_: TokenType::LineEnd,
-                    source: &asm[j..=j],
+                    source: Cow::Borrowed(&asm[j..=j]),
                     span: Span::new(j - line_start, j - line_start + 1, line_number),
                 });
                 line_number += 1;
@@ -117,11 +119,11 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
             '%' | '(' | ')' | '[' | ']' | '{' | '}' | '@' | '#' | ',' | ':' | '=' => {
                 tokens.push(Token {
                     type_: TokenType::try_from_char(char).unwrap(),
-                    source: &asm[j..=j],
+                    source: Cow::Borrowed(&asm[j..=j]),
                     span: Span::new(j - line_start, j - line_start + 1, line_number),
                 })
             }
-            c if c.is_alphabetic() => {
+            c if c.is_alphabetic() || c == '_' => {
                 let start = j;
                 let mut end = j;
 
@@ -133,7 +135,7 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
 
                 tokens.push(Token {
                     type_: TokenType::Ident,
-                    source: &asm[start..end + 1],
+                    source: Cow::Borrowed(&asm[start..end + 1]),
                     span: Span::new(start - line_start, end - line_start + 1, line_number),
                 })
             }
@@ -147,13 +149,13 @@ pub fn tokenize_lmc_asm<'a>(asm: &'a str) -> CompilerResult<'a, Vec<Token>> {
 
                 tokens.push(Token {
                     type_: TokenType::Literal,
-                    source: &asm[start..end + 1],
+                    source: Cow::Borrowed(&asm[start..end + 1]),
                     span: Span::new(start - line_start, end - line_start + 1, line_number),
                 })
             }
             c if c.is_whitespace() => {}
             _ => errors.push(CompilerError::InvalidCharacter(
-                &asm[j..=j],
+                asm[j..=j].to_string(),
                 Span::new(j - line_start, j - line_start + 1, line_number),
             )),
         }
