@@ -1,0 +1,12 @@
+[[language]]
+name = "lmc"
+grammar = "lmc"
+scope = "source.lmc"
+roots = []
+comment-token = ";"
+indent = { tab-width = 4, unit = "    " }
+file-types = ["lmc"]
+
+[[grammar]]
+name = "lmc"
+source = { path = "/home/jcah/Programming/tree-sitter-lmc" }

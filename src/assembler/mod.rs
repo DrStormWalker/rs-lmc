@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use regex::Regex;
-
 use crate::{
     error::CompilerResult,
     instruction::{Inst, RawInst},
@@ -11,12 +9,14 @@ use crate::{
 use self::{
     labels::process_labels,
     macros::expand_lmc_macros,
+    optimizer::optimize_lmc_asm,
     parser::{parse_lmc_asm, SymbolTable},
     tokenizer::{tokenize_lmc_asm, TokenType},
 };
 
 pub mod labels;
 pub mod macros;
+pub mod optimizer;
 pub mod parser;
 pub mod tokenizer;
 
@@ -106,7 +106,9 @@ pub fn tokenize_and_parse_lmc_asm<'a>(
             .collect()
     };
 
-    parse_lmc_asm(tokens)
+    let (raw_insts, symbol_table) = parse_lmc_asm(tokens)?;
+
+    optimize_lmc_asm(raw_insts, symbol_table)
 }
 
 pub fn assemble_lmc_asm<'a>(

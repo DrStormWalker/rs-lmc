@@ -343,7 +343,7 @@ pub fn expand_init_macro<'a, 'b>(
                     },
                 ]
             })
-            .take(stack_size - 1)
+            .take(call_stack_size - 1)
             .flatten()
             .collect::<Vec<_>>(),
         );
@@ -810,6 +810,12 @@ pub fn expand_push_macro<'a, 'b>(
         }
     };
 
+    //      STA arg1
+    //      LDA #_end
+    //      STA arg2
+    //      BRA push
+    // _end ADD #0
+
     //      STA _tmp
     //      STA @%ptr
     //      LDA %ptr
@@ -972,6 +978,18 @@ pub fn expand_bsub_macro<'a, 'b>(
             expected: vec!["`)`"],
         }]);
     }
+
+    //      LDA #_end
+    //      STA @%ptr
+    //      LDA #%label
+    //      BRA bsub
+    // _end ADD #0
+
+    // bsub STA arg
+    //      LDA %ptr
+    //      ADD #1
+    //      STA %ptr
+    //      BRA @arg
 
     //      LDA #_end
     //      STA @%ptr
