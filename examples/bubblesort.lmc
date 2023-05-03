@@ -1,0 +1,218 @@
+%init(
+    stack size      = 2,
+    call stack size = 1,
+)
+%_start
+
+%print:
+    %pop
+    STA print_ptr
+
+    %pop
+    STA print_len
+
+%print_loop:
+    LDA @print_ptr
+    OUT
+
+    LDA print_ptr
+    ADD #1
+    STA print_ptr
+
+    LDA print_len
+    SUB #1
+    STA print_len
+    SUB #1
+    BRP print_loop
+
+    %ret
+
+print_len DAT
+print_ptr DAT
+
+%bubblesort:
+    %pop
+    STA bubblesort_ptr
+
+    %pop
+    SUB #2
+    ADD bubblesort_ptr
+    STA bubblesort_i
+
+%bubblesort_i_loop:
+    LDA bubblesort_ptr
+    STA bubblesort_j
+
+    LDA #0
+    STA bubblesort_swapped
+
+%bubblesort_j_loop:
+    LDA @bubblesort_j
+    STA bubblesort_tmp
+
+    LDA bubblesort_j
+    ADD #1
+    STA bubblesort_j_1
+
+    LDA bubblesort_tmp
+    SUB @bubblesort_j_1
+
+    BRP bubblesort_swap
+    BRA bubblesort_no_swap
+
+%bubblesort_swap:
+    LDA @bubblesort_j_1
+    STA @bubblesort_j
+
+    LDA bubblesort_tmp
+    STA @bubblesort_j_1
+
+    LDA #1
+    STA bubblesort_swapped
+
+%bubblesort_no_swap:
+    LDA bubblesort_j_1
+    STA bubblesort_j
+    SUB bubblesort_i
+
+    SUB #1
+    BRP bubblesort_cont
+    BRA bubblesort_j_loop
+
+%bubblesort_cont:
+    LDA bubblesort_swapped
+    BRZ bubblesort_ret
+
+    LDA bubblesort_i
+    SUB #1
+    STA bubblesort_i
+    SUB bubblesort_ptr
+    BRP bubblesort_i_loop
+
+%bubblesort_ret:
+    %ret
+
+bubblesort_tmp     DAT
+bubblesort_i       DAT
+bubblesort_j       DAT
+bubblesort_j_1     DAT
+bubblesort_ptr     DAT
+bubblesort_swapped DAT
+
+%_start:
+    LDA arr_len
+    %push
+    LDA #arr
+    %push
+    %bsub( bubblesort )
+
+    LDA arr_len
+    %push
+    LDA #arr
+    %push
+    %bsub( print )
+
+    HLT
+
+arr_len DAT 100
+
+arr     DAT 95
+arr_1   DAT 14
+arr_2   DAT 99
+arr_3   DAT 8
+arr_4   DAT 52
+arr_5   DAT 28
+arr_6   DAT 85
+arr_7   DAT 3
+arr_8   DAT 74
+arr_9   DAT 68
+arr_10  DAT 83
+arr_11  DAT 13
+arr_12  DAT 33
+arr_13  DAT 87
+arr_14  DAT 67
+arr_15  DAT 75
+arr_16  DAT 81
+arr_17  DAT 31
+arr_18  DAT 36
+arr_19  DAT 58
+arr_20  DAT 100
+arr_21  DAT 6
+arr_22  DAT 62
+arr_23  DAT 10
+arr_24  DAT 2
+arr_25  DAT 94
+arr_26  DAT 89
+arr_27  DAT 57
+arr_28  DAT 50
+arr_29  DAT 72
+arr_30  DAT 20
+arr_31  DAT 70
+arr_32  DAT 42
+arr_33  DAT 61
+arr_34  DAT 49
+arr_35  DAT 47
+arr_36  DAT 86
+arr_37  DAT 5
+arr_38  DAT 34
+arr_39  DAT 21
+arr_40  DAT 96
+arr_41  DAT 78
+arr_42  DAT 30
+arr_43  DAT 53
+arr_44  DAT 60
+arr_45  DAT 23
+arr_46  DAT 46
+arr_47  DAT 92
+arr_48  DAT 65
+arr_49  DAT 66
+arr_50  DAT 19
+arr_51  DAT 37
+arr_52  DAT 90
+arr_53  DAT 29
+arr_54  DAT 12
+arr_55  DAT 84
+arr_56  DAT 71
+arr_57  DAT 54
+arr_58  DAT 51
+arr_59  DAT 43
+arr_60  DAT 82
+arr_61  DAT 25
+arr_62  DAT 64
+arr_63  DAT 76
+arr_64  DAT 55
+arr_65  DAT 27
+arr_66  DAT 98
+arr_67  DAT 9
+arr_68  DAT 97
+arr_69  DAT 40
+arr_70  DAT 44
+arr_71  DAT 17
+arr_72  DAT 24
+arr_73  DAT 88
+arr_74  DAT 79
+arr_75  DAT 39
+arr_76  DAT 77
+arr_77  DAT 38
+arr_78  DAT 32
+arr_79  DAT 73
+arr_80  DAT 59
+arr_81  DAT 7
+arr_82  DAT 11
+arr_83  DAT 35
+arr_84  DAT 1
+arr_85  DAT 93
+arr_86  DAT 16
+arr_87  DAT 63
+arr_88  DAT 80
+arr_89  DAT 18
+arr_90  DAT 56
+arr_91  DAT 91
+arr_92  DAT 41
+arr_93  DAT 22
+arr_94  DAT 69
+arr_95  DAT 48
+arr_96  DAT 45
+arr_97  DAT 26
+arr_98  DAT 15
+arr_99  DAT 4

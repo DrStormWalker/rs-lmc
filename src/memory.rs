@@ -56,7 +56,7 @@ impl StorageCell for String {
             "Inf" => Value::InfPositive,
             "-Inf" => Value::InfNegative,
             "NaN" => Value::NaN,
-            _ => Value::Number(self.parse().unwrap()),
+            _ => Value::Number(value.parse().unwrap()),
         }
     }
 

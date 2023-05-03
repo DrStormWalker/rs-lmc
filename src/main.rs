@@ -15,6 +15,7 @@ use std::{
 
 use assembler::SourceMap;
 use clap::{Args, Parser, Subcommand};
+use colored::Colorize;
 use error::{CompilerResult, InterpreterErrorRenderer};
 use instruction::Inst;
 use interpreter::Vm;
@@ -43,6 +44,9 @@ struct ExpandArgs {
 
     #[arg(long, default_value_t = false)]
     no_macros: bool,
+
+    #[arg(long, short, default_value_t = false)]
+    line_numbers: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -107,29 +111,49 @@ fn _expand<'a>(args: &ExpandArgs, asm: &'a str) -> CompilerResult<'a, ()> {
     use assembler::tokenize_and_parse_lmc_asm;
     use std::iter;
 
-    let (insts, _) = tokenize_and_parse_lmc_asm(asm, !args.no_macros)?;
+    let (insts, symbol_table) = tokenize_and_parse_lmc_asm(asm, !args.no_macros)?;
+
+    // for (label, symbol) in symbol_table {
+    //     println!("{}: {}", label, symbol.addr);
+    // }
 
     let label_padding = insts
         .iter()
         .filter_map(|i| i.label.as_ref().map(|l| l.source.len()))
         .max()
-        .map_or(0, |v| v + 2);
+        .map_or(0, |v| v + 1);
 
     let label_padding: String = iter::repeat(' ').take(label_padding).collect();
 
-    for inst in insts {
+    let number_padding = (insts.len() - 1).to_string().len();
+
+    let number_padding: String = iter::repeat(' ').take(number_padding + 1).collect();
+
+    for (i, inst) in insts.into_iter().enumerate() {
         let label = inst
             .label
             .map(|l| l.source[..].to_string())
             .unwrap_or("".to_string());
 
+        let i = i.to_string();
+
         println!(
-            "{}{}{}{}",
+            "{}{}{}{}{}",
+            if args.line_numbers {
+                format!(
+                    "{}{}{} ",
+                    i.bright_blue().bold(),
+                    &number_padding[i.len()..],
+                    "|".bright_blue().bold()
+                )
+            } else {
+                "".to_string()
+            },
             label,
             &label_padding[label.len()..],
             inst.opcode.1.as_str(),
             inst.operand
-                .map(|o| format!("  {}", o.1.to_string()))
+                .map(|o| format!(" {}", o.1.to_string()))
                 .unwrap_or("".to_string()),
         )
     }

@@ -6,7 +6,7 @@ use crate::{
 
 pub fn optimize_lmc_asm<'a>(
     mut raw_insts: Vec<RawInst<'a>>,
-    symbol_table: SymbolTable<'a>,
+    mut symbol_table: SymbolTable<'a>,
 ) -> CompilerResult<'a, (Vec<RawInst<'a>>, SymbolTable<'a>)> {
     let mut i = 0;
 
@@ -27,6 +27,18 @@ pub fn optimize_lmc_asm<'a>(
                         opcode,
                         operand,
                     } => {
+                        let label = label.map(|mut l| {
+                            l.span = opcode.0;
+
+                            l
+                        });
+
+                        for (_, symbol) in symbol_table.iter_mut() {
+                            if symbol.addr > i {
+                                symbol.addr -= 1;
+                            }
+                        }
+
                         let new_inst = RawInst {
                             label,
                             opcode,

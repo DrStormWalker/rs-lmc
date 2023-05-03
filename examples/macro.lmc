@@ -112,88 +112,81 @@
 ;
 ; ```lmc
 ;
-;                                 LDA  #STACK
-;                                 STA  STACK_PTR
-;                                 LDA  #CALL_STACK
-;                                 STA  CALL_STACK_PTR
-;                                 BRA  _f5d51ec80d012e60_init_end
-; STACK_PTR                       DAT  STACK
-; CALL_STACK_PTR                  DAT  CALL_STACK
-; STACK                           DAT
-; _f5d51ec80d012e60_stack_1       DAT
-; CALL_STACK                      DAT
-; _f5d51ec80d012e60_call_stack_1  DAT
-; _ret                            STA  _f5d51ec80d012e60_tmp
-;                                 LDA  CALL_STACK_PTR
-;                                 SUB  #1
-;                                 STA  CALL_STACK_PTR
-;                                 LDA  @CALL_STACK_PTR
-;                                 STA  _f5d51ec80d012e60_ptr
-;                                 LDA  _f5d51ec80d012e60_tmp
-;                                 BRA  @_f5d51ec80d012e60_ptr
-; _f5d51ec80d012e60_tmp           DAT
-; _f5d51ec80d012e60_ptr           DAT
-; _f5d51ec80d012e60_init_end      ADD  #0
-;                                 BRA  _start
-; print                           ADD  #0
-;                                 LDA  STACK_PTR
-;                                 SUB  #1
-;                                 STA  STACK_PTR
-;                                 LDA  @STACK_PTR
-;                                 OUT
-;                                 BRA  _ret
-; _start                          ADD  #0
-;                                 LDA  #1
-;                                 STA  _11b670162a88e6a_tmp
-;                                 STA  @STACK_PTR
-;                                 LDA  STACK_PTR
-;                                 ADD  #1
-;                                 STA  STACK_PTR
-;                                 BRA  _11b670162a88e6a_end
-; _11b670162a88e6a_tmp            DAT
-; _11b670162a88e6a_end            LDA  _11b670162a88e6a_tmp
-;                                 LDA  #_60d1d6fdd6ad7948_end
-;                                 STA  @CALL_STACK_PTR
-;                                 LDA  CALL_STACK_PTR
-;                                 ADD  #1
-;                                 STA  CALL_STACK_PTR
-;                                 BRA  print
-; _60d1d6fdd6ad7948_end           ADD  #0
-;                                 LDA  #2
-;                                 STA  _2a01117545706639_tmp
-;                                 STA  @STACK_PTR
-;                                 LDA  STACK_PTR
-;                                 ADD  #1
-;                                 STA  STACK_PTR
-;                                 BRA  _2a01117545706639_end
-; _2a01117545706639_tmp           DAT
-; _2a01117545706639_end           LDA  _2a01117545706639_tmp
-;                                 LDA  #3
-;                                 STA  _41577f94951aff7c_tmp
-;                                 STA  @STACK_PTR
-;                                 LDA  STACK_PTR
-;                                 ADD  #1
-;                                 STA  STACK_PTR
-;                                 BRA  _41577f94951aff7c_end
-; _41577f94951aff7c_tmp           DAT
-; _41577f94951aff7c_end           LDA  _41577f94951aff7c_tmp
-;                                 LDA  #_6ea6ba5de9f984ca_end
-;                                 STA  @CALL_STACK_PTR
-;                                 LDA  CALL_STACK_PTR
-;                                 ADD  #1
-;                                 STA  CALL_STACK_PTR
-;                                 BRA  print
-; _6ea6ba5de9f984ca_end           ADD  #0
-;                                 LDA  #_da5cef6ece06e729_end
-;                                 STA  @CALL_STACK_PTR
-;                                 LDA  CALL_STACK_PTR
-;                                 ADD  #1
-;                                 STA  CALL_STACK_PTR
-;                                 BRA  print
-; _da5cef6ece06e729_end           ADD  #0
-;                                 LDA  #4
-;                                 OUT
-;                                 HLT
+;                             LDA  #STACK
+;                             STA  STACK_PTR
+;                             LDA  #CALL_STACK
+;                             STA  CALL_STACK_PTR
+;                             BRA  _f5d51ec80d012e60_init_end
+; STACK_PTR                   DAT  STACK
+; CALL_STACK_PTR              DAT  CALL_STACK
+; STACK                       DAT
+; _f5d51ec80d012e60_stack_1   DAT
+; CALL_STACK                  DAT
+; _ret                        STA  _f5d51ec80d012e60_tmp
+;                             LDA  CALL_STACK_PTR
+;                             SUB  #1
+;                             STA  CALL_STACK_PTR
+;                             LDA  @CALL_STACK_PTR
+;                             STA  _f5d51ec80d012e60_ptr
+;                             LDA  _f5d51ec80d012e60_tmp
+;                             BRA  @_f5d51ec80d012e60_ptr
+; _f5d51ec80d012e60_tmp       DAT
+; _f5d51ec80d012e60_ptr       DAT
+; _f5d51ec80d012e60_init_end  BRA  _start
+; print                       LDA  STACK_PTR
+;                             SUB  #1
+;                             STA  STACK_PTR
+;                             LDA  @STACK_PTR
+;                             OUT
+;                             BRA  _ret
+; _start                      LDA  #1
+;                             STA  _11b670162a88e6a_tmp
+;                             STA  @STACK_PTR
+;                             LDA  STACK_PTR
+;                             ADD  #1
+;                             STA  STACK_PTR
+;                             BRA  _11b670162a88e6a_end
+; _11b670162a88e6a_tmp        DAT
+; _11b670162a88e6a_end        LDA  _11b670162a88e6a_tmp
+;                             LDA  #_60d1d6fdd6ad7948_end
+;                             STA  @CALL_STACK_PTR
+;                             LDA  CALL_STACK_PTR
+;                             ADD  #1
+;                             STA  CALL_STACK_PTR
+;                             BRA  print
+; _60d1d6fdd6ad7948_end       LDA  #2
+;                             STA  _2a01117545706639_tmp
+;                             STA  @STACK_PTR
+;                             LDA  STACK_PTR
+;                             ADD  #1
+;                             STA  STACK_PTR
+;                             BRA  _2a01117545706639_end
+; _2a01117545706639_tmp       DAT
+; _2a01117545706639_end       LDA  _2a01117545706639_tmp
+;                             LDA  #3
+;                             STA  _41577f94951aff7c_tmp
+;                             STA  @STACK_PTR
+;                             LDA  STACK_PTR
+;                             ADD  #1
+;                             STA  STACK_PTR
+;                             BRA  _41577f94951aff7c_end
+; _41577f94951aff7c_tmp       DAT
+; _41577f94951aff7c_end       LDA  _41577f94951aff7c_tmp
+;                             LDA  #_6ea6ba5de9f984ca_end
+;                             STA  @CALL_STACK_PTR
+;                             LDA  CALL_STACK_PTR
+;                             ADD  #1
+;                             STA  CALL_STACK_PTR
+;                             BRA  print
+; _6ea6ba5de9f984ca_end       LDA  #_da5cef6ece06e729_end
+;                             STA  @CALL_STACK_PTR
+;                             LDA  CALL_STACK_PTR
+;                             ADD  #1
+;                             STA  CALL_STACK_PTR
+;                             BRA  print
+; _da5cef6ece06e729_end       LDA  #4
+;                             OUT
+;                             HLT
 ;
 ; ```
 ;
